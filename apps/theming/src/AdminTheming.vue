@@ -106,6 +106,23 @@
 				</a>
 			</div>
 		</NcSettingsSection>
+		<NcSettingsSection :title="t('theming', 'App menu settings')">
+			<div class="admin-theming-advanced">
+				<AppsSelectorField :name="defaultAppField.name"
+					:value="defaultAppField.value"
+					:default-value="defaultAppField.defaultValue"
+					:display-name="defaultAppField.displayName"
+					:label="defaultAppField.label"
+					@update:theming="$emit('update:theming')" />
+				<CheckboxField :name="userDefaultAppField.name"
+					:value="userDefaultAppField.value"
+					:default-value="userDefaultAppField.defaultValue"
+					:display-name="userDefaultAppField.displayName"
+					:label="userDefaultAppField.label"
+					:description="userDefaultAppField.description"
+					@update:theming="$emit('update:theming')" />
+			</div>
+		</NcSettingsSection>
 	</section>
 </template>
 
@@ -114,6 +131,7 @@ import { loadState } from '@nextcloud/initial-state'
 
 import NcNoteCard from '@nextcloud/vue/dist/Components/NcNoteCard.js'
 import NcSettingsSection from '@nextcloud/vue/dist/Components/NcSettingsSection.js'
+import AppsSelectorField from './components/AppsSelectorField.vue'
 import CheckboxField from './components/admin/CheckboxField.vue'
 import ColorPickerField from './components/admin/ColorPickerField.vue'
 import FileInputField from './components/admin/FileInputField.vue'
@@ -136,6 +154,8 @@ const {
 	slogan,
 	url,
 	userThemingDisabled,
+	defaultApps,
+	userDefaultAppDisabled,
 } = loadState('theming', 'adminThemingParameters')
 
 const textFields = [
@@ -243,10 +263,28 @@ const userThemingField = {
 	description: t('theming', 'Although you can select and customize your instance, users can change their background and colors. If you want to enforce your customization, you can toggle this on.'),
 }
 
+const userDefaultAppField = {
+	name: 'disable-user-default-apps',
+	value: userDefaultAppDisabled,
+	defaultValue: true,
+	displayName: t('theming', 'User default app'),
+	label: t('theming', 'Disable user defined default app'),
+	description: t('theming', 'Toggle this off to allow users to set their own default app.'),
+}
+
+const defaultAppField = {
+	name: 'default-apps',
+	value: defaultApps,
+	defaultValue: ['dashboard', 'files'],
+	displayName: t('theming', 'Global default apps'),
+	label: t('theming', 'Global default apps with fallback'),
+}
+
 export default {
 	name: 'AdminTheming',
 
 	components: {
+		AppsSelectorField,
 		CheckboxField,
 		ColorPickerField,
 		FileInputField,
@@ -259,6 +297,8 @@ export default {
 		'update:theming',
 	],
 
+	textFields,
+
 	data() {
 		return {
 			textFields,
@@ -267,6 +307,8 @@ export default {
 			advancedTextFields,
 			advancedFileInputFields,
 			userThemingField,
+			defaultAppField,
+			userDefaultAppField,
 
 			canThemeIcons,
 			docUrl,

@@ -251,4 +251,32 @@ interface IAppManager {
 	 * @since 25.0.6
 	 */
 	public function getDefaultAppForUser(?IUser $user = null): string;
+
+	/**
+	 * Set the user's default app
+	 *
+	 * If `user` is not passed, the currently logged in user will be used
+	 *
+	 * @throws \InvalidArgumentException If no user given as parameter and no current user is logged in
+	 * @throws \InvalidArgumentException If app is not enabled for the user
+	 * @since 28.0.0
+	 */
+	public function setDefaultAppForUser(string $appId, ?IUser $user = null);
+
+	/**
+	 * Get the global default apps with fallbacks
+	 *
+	 * @return string[] The default applications
+	 * @since 28.0.0
+	 */
+	public function getDefaultApps(): array;
+
+	/**
+	 * Set the global default apps with fallbacks
+	 *
+	 * @param string[] $appId
+	 * @throws \InvalidArgumentException If any of the apps is not installed
+	 * @since 28.0.0
+	 */
+	public function setDefaultApps(array $defaultApps): void;
 }

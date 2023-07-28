@@ -38,6 +38,7 @@
  */
 namespace OC\App;
 
+use InvalidArgumentException;
 use OC\AppConfig;
 use OC\AppFramework\Bootstrap\Coordinator;
 use OC\ServerNotAvailableException;
@@ -844,5 +845,33 @@ class AppManager implements IAppManager {
 		}
 
 		return $appId;
+	}
+
+	public function setDefaultAppForUser(string $appId, ?IUser $user = null): void {
+		$user ??= $this->userSession->getUser();
+
+		if ($user === null) {
+			throw new InvalidArgumentException('No user given as parameter and no current user logged in');
+		} elseif (!$this->isEnabledForUser($appId, $user)) {
+			$this->logger->debug('App is not enabled for user', ['app_id' => $appId, 'user' => $user->getUID()]);
+			throw new InvalidArgumentException('App is not enabled for user');
+		}
+
+		$this->config->setUserValue($user->getUID(), 'core', 'defaultapp', $appId);
+	}
+
+	public function getDefaultApps(): array {
+		return explode(',', $this->config->getSystemValueString('defaultapp', 'dashboard,files'));
+	}
+
+	public function setDefaultApps(array $defaultApps): void {
+		foreach ($defaultApps as $app) {
+			if (!$this->isInstalled($app)) {
+				$this->logger->debug('Can not set not installed app as default app', ['missing_app' => $app]);
+				throw new InvalidArgumentException('App is not installed');
+			}
+		}
+
+		$this->config->setSystemValue('defaultapp', join(',', $defaultApps));
 	}
 }
