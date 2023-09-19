@@ -23,7 +23,28 @@
 	<NcAppContent data-cy-files-content>
 		<div class="files-list__header">
 			<!-- Current folder breadcrumbs -->
-			<BreadCrumbs :path="dir" @reload="fetchContent" />
+			<BreadCrumbs :path="dir" @reload="fetchContent">
+				<template #actions>
+					<NcButton v-if="canShare"
+						:aria-label="shareButtonLabel"
+						:class="{ 'files-list__header-share-button--shared': shareButtonType }"
+						:title="shareButtonLabel"
+						class="files-list__header-share-button"
+						type="tertiary"
+						@click="openSharingSidebar">
+						<template #icon>
+							<LinkIcon v-if="shareButtonType === Type.SHARE_TYPE_LINK" />
+							<ShareVariantIcon v-else :size="20" />
+						</template>
+					</NcButton>
+					<!-- Uploader -->
+					<UploadPicker v-if="currentFolder && canUpload"
+						:content="dirContents"
+						:destination="currentFolder"
+						:multiple="true"
+						@uploaded="onUpload" />
+				</template>
+			</BreadCrumbs>
 
 			<!-- Secondary loading indicator -->
 			<NcLoadingIcon v-if="isRefreshing" class="files-list__refresh-icon" />
@@ -64,21 +85,32 @@
 
 <script lang="ts">
 import type { Route } from 'vue-router'
+import type { Upload } from '@nextcloud/upload'
 import type { UserConfig } from '../types.ts'
+import type { View, ContentsWithRoot } from '@nextcloud/files'
 
-import { Folder, Node, type View, type ContentsWithRoot, join } from 'path'
+import { Folder, Node, Permission } from '@nextcloud/files'
+import { getCapabilities } from '@nextcloud/capabilities'
+import { join, dirname } from 'path'
 import { orderBy } from 'natural-orderby'
 import { translate } from '@nextcloud/l10n'
+import { UploadPicker } from '@nextcloud/upload'
+import { Type } from '@nextcloud/sharing'
+import Vue from 'vue'
+
 import NcAppContent from '@nextcloud/vue/dist/Components/NcAppContent.js'
 import NcButton from '@nextcloud/vue/dist/Components/NcButton.js'
 import NcEmptyContent from '@nextcloud/vue/dist/Components/NcEmptyContent.js'
 import NcIconSvgWrapper from '@nextcloud/vue/dist/Components/NcIconSvgWrapper.js'
 import NcLoadingIcon from '@nextcloud/vue/dist/Components/NcLoadingIcon.js'
-import Vue from 'vue'
+import LinkIcon from 'vue-material-design-icons/Link.vue'
+import ShareVariantIcon from 'vue-material-design-icons/ShareVariant.vue'
 
+import { action as sidebarAction } from '../actions/sidebarAction.ts'
 import { useFilesStore } from '../store/files.ts'
 import { usePathsStore } from '../store/paths.ts'
 import { useSelectionStore } from '../store/selection.ts'
+import { useUploaderStore } from '../store/uploader.ts'
 import { useUserConfigStore } from '../store/userconfig.ts'
 import { useViewConfigStore } from '../store/viewConfig.ts'
 import BreadCrumbs from '../components/BreadCrumbs.vue'
@@ -86,17 +118,22 @@ import FilesListVirtual from '../components/FilesListVirtual.vue'
 import filesSortingMixin from '../mixins/filesSorting.ts'
 import logger from '../logger.js'
 
+const isSharingEnabled = getCapabilities()?.files_sharing !== undefined
+
 export default Vue.extend({
 	name: 'FilesList',
 
 	components: {
 		BreadCrumbs,
 		FilesListVirtual,
+		LinkIcon,
 		NcAppContent,
 		NcButton,
 		NcEmptyContent,
 		NcIconSvgWrapper,
 		NcLoadingIcon,
+		ShareVariantIcon,
+		UploadPicker,
 	},
 
 	mixins: [
@@ -107,12 +144,14 @@ export default Vue.extend({
 		const filesStore = useFilesStore()
 		const pathsStore = usePathsStore()
 		const selectionStore = useSelectionStore()
+		const uploaderStore = useUploaderStore()
 		const userConfigStore = useUserConfigStore()
 		const viewConfigStore = useViewConfigStore()
 		return {
 			filesStore,
 			pathsStore,
 			selectionStore,
+			uploaderStore,
 			userConfigStore,
 			viewConfigStore,
 		}
@@ -122,6 +161,7 @@ export default Vue.extend({
 		return {
 			loading: true,
 			promise: null,
+			Type,
 		}
 	},
 
@@ -140,7 +180,7 @@ export default Vue.extend({
 		 */
 		dir(): string {
 			// Remove any trailing slash but leave root slash
-			return (this.$route?.query?.dir || '/').replace(/^(.+)\/$/, '$1')
+			return (this.$route?.query?.dir?.toString() || '/').replace(/^(.+)\/$/, '$1')
 		},
 
 		/**
@@ -225,6 +265,43 @@ export default Vue.extend({
 			const dir = this.dir.split('/').slice(0, -1).join('/') || '/'
 			return { ...this.$route, query: { dir } }
 		},
+
+		shareAttributes(): number[]|undefined {
+			if (!this.currentFolder?.attributes?.['share-types']) {
+				return undefined
+			}
+			return Object.values(this.currentFolder?.attributes?.['share-types'] || {}).flat() as number[]
+		},
+		shareButtonLabel() {
+			if (!this.shareAttributes) {
+				return this.t('files', 'Share')
+			}
+
+			if (this.shareButtonType === Type.SHARE_TYPE_LINK) {
+				return this.t('files', 'Shared by link')
+			}
+			return this.t('files', 'Shared')
+		},
+		shareButtonType(): Type|null {
+			if (!this.shareAttributes) {
+				return null
+			}
+
+			// If all types are links, show the link icon
+			if (this.shareAttributes.some(type => type === Type.SHARE_TYPE_LINK)) {
+				return Type.SHARE_TYPE_LINK
+			}
+
+			return Type.SHARE_TYPE_USER
+		},
+
+		canUpload() {
+			return this.currentFolder && (this.currentFolder.permissions & Permission.CREATE) !== 0
+		},
+		canShare() {
+			return isSharingEnabled
+				&& this.currentFolder && (this.currentFolder.permissions & Permission.SHARE) !== 0
+		},
 	},
 
 	watch: {
@@ -251,11 +328,20 @@ export default Vue.extend({
 		},
 	},
 
+	mounted() {
+		this.fetchContent()
+	},
+
 	methods: {
 		async fetchContent() {
 			this.loading = true
 			const dir = this.dir
 			const currentView = this.currentView
+
+			if (!currentView) {
+				logger.debug('The current view doesn\'t exists or is not ready.', { currentView })
+				return
+			}
 
 			// If we have a cancellable promise ongoing, cancel it
 			if (typeof this.promise?.cancel === 'function') {
@@ -273,6 +359,7 @@ export default Vue.extend({
 				this.filesStore.updateNodes(contents)
 
 				// Define current directory children
+				// TODO: make it more official
 				folder._children = contents.map(node => node.fileid)
 
 				// If we're in the root dir, define the root
@@ -308,8 +395,33 @@ export default Vue.extend({
 		 * @param {number} fileId the file id to get
 		 * @return {Folder|File}
 		 */
-		 getNode(fileId) {
+		getNode(fileId) {
 			return this.filesStore.getNode(fileId)
+		},
+
+		/**
+		 * The upload manager have finished handling the queue
+		 * @param {Upload} upload the uploaded data
+		 */
+		onUpload(upload: Upload) {
+			// Let's only refresh the current Folder
+			// Navigating to a different folder will refresh it anyway
+			const destinationSource = dirname(upload.source)
+			const needsRefresh = destinationSource === this.currentFolder?.source
+
+			// TODO: fetch uploaded files data only
+			// Use parseInt(upload.response?.headers?.['oc-fileid']) to get the fileid
+			if (needsRefresh) {
+				// fetchContent will cancel the previous ongoing promise
+				this.fetchContent()
+			}
+		},
+
+		openSharingSidebar() {
+			if (window?.OCA?.Files?.Sidebar?.setActiveTab) {
+				window.OCA.Files.Sidebar.setActiveTab('sharing')
+			}
+			sidebarAction.exec(this.currentFolder, this.currentView, this.currentFolder.path)
 		},
 
 		t: translate,
@@ -342,12 +454,21 @@ $navigationToggleSize: 50px;
 			// Only the breadcrumbs shrinks
 			flex: 0 0;
 		}
+
+		&-share-button {
+			opacity: .3;
+			&--shared {
+				opacity: 1;
+			}
+		}
 	}
+
 	&__refresh-icon {
 		flex: 0 0 44px;
 		width: 44px;
 		height: 44px;
 	}
+
 	&__loading-icon {
 		margin: auto;
 	}

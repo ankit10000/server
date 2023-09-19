@@ -29,7 +29,11 @@
 					button-class="icon-add"
 					@click="showNewUserMenu"
 					@keyup.enter="showNewUserMenu"
-					@keyup.space="showNewUserMenu" />
+					@keyup.space="showNewUserMenu">
+					<template #icon>
+						<Plus :size="20" />
+					</template>
+				</NcAppNavigationNew>
 
 				<template #list>
 					<NcAppNavigationNewItem id="addgroup"
@@ -52,7 +56,7 @@
 							<AccountGroup :size="20" />
 						</template>
 						<template #counter>
-							<NcCounterBubble :type="!selectedGroupDecoded ? 'highlighted' : undefined">
+							<NcCounterBubble v-if="userCount" :type="!selectedGroupDecoded ? 'highlighted' : undefined">
 								{{ userCount }}
 							</NcCounterBubble>
 						</template>

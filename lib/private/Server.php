@@ -147,6 +147,7 @@ use OC\Security\TrustedDomainHelper;
 use OC\Security\VerificationToken\VerificationToken;
 use OC\Session\CryptoWrapper;
 use OC\Share20\ProviderFactory;
+use OC\Share20\ShareDisableChecker;
 use OC\Share20\ShareHelper;
 use OC\SpeechToText\SpeechToTextManager;
 use OC\SystemTag\ManagerFactory as SystemTagManagerFactory;
@@ -785,8 +786,8 @@ class Server extends ServerContainer implements IServerContainer {
 		$this->registerDeprecatedAlias('Search', ISearch::class);
 
 		$this->registerService(\OC\Security\RateLimiting\Backend\IBackend::class, function ($c) {
-			$cacheFactory = $c->get(ICacheFactory::class);
-			if ($cacheFactory->isAvailable()) {
+			$config = $c->get(\OCP\IConfig::class);
+			if (ltrim($config->getSystemValueString('memcache.distributed', ''), '\\') === \OC\Memcache\Redis::class) {
 				$backend = new \OC\Security\RateLimiting\Backend\MemoryCacheBackend(
 					$c->get(AllConfig::class),
 					$this->get(ICacheFactory::class),
@@ -1252,7 +1253,8 @@ class Server extends ServerContainer implements IServerContainer {
 				$c->get('ThemingDefaults'),
 				$c->get(IEventDispatcher::class),
 				$c->get(IUserSession::class),
-				$c->get(KnownUserService::class)
+				$c->get(KnownUserService::class),
+				$c->get(ShareDisableChecker::class)
 			);
 
 			return $manager;
@@ -2106,7 +2108,7 @@ class Server extends ServerContainer implements IServerContainer {
 	}
 
 	/**
-	 * @return Throttler
+	 * @return IThrottler
 	 * @deprecated 20.0.0
 	 */
 	public function getBruteForceThrottler() {

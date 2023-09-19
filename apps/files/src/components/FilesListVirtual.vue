@@ -67,11 +67,13 @@
 </template>
 
 <script lang="ts">
-import { translate, translatePlural } from '@nextcloud/l10n'
-import { getFileListHeaders, type Node } from '@nextcloud/files'
+import type { PropType } from 'vue'
+import type { Node } from '@nextcloud/files'
+
+import { translate as t, translatePlural as n } from '@nextcloud/l10n'
+import { getFileListHeaders, Folder, View } from '@nextcloud/files'
 import { showError } from '@nextcloud/dialogs'
 import Vue from 'vue'
-import VirtualList from './VirtualList.vue'
 
 import { action as sidebarAction } from '../actions/sidebarAction.ts'
 import FileEntry from './FileEntry.vue'
@@ -80,6 +82,7 @@ import FilesListTableFooter from './FilesListTableFooter.vue'
 import FilesListTableHeader from './FilesListTableHeader.vue'
 import filesListWidthMixin from '../mixins/filesListWidth.ts'
 import logger from '../logger.js'
+import VirtualList from './VirtualList.vue'
 
 export default Vue.extend({
 	name: 'FilesListVirtual',
@@ -97,15 +100,15 @@ export default Vue.extend({
 
 	props: {
 		currentView: {
-			type: Object,
+			type: View,
 			required: true,
 		},
 		currentFolder: {
-			type: Object,
+			type: Folder,
 			required: true,
 		},
 		nodes: {
-			type: Array,
+			type: Array as PropType<Node[]>,
 			required: true,
 		},
 	},
@@ -129,14 +132,14 @@ export default Vue.extend({
 
 		summaryFile() {
 			const count = this.files.length
-			return translatePlural('files', '{count} file', '{count} files', count, { count })
+			return n('files', '{count} file', '{count} files', count, { count })
 		},
 		summaryFolder() {
 			const count = this.nodes.length - this.files.length
-			return translatePlural('files', '{count} folder', '{count} folders', count, { count })
+			return n('files', '{count} folder', '{count} folders', count, { count })
 		},
 		summary() {
-			return translate('files', '{summaryFile} and {summaryFolder}', this)
+			return t('files', '{summaryFile} and {summaryFolder}', this)
 		},
 		isMtimeAvailable() {
 			// Hide mtime column on narrow screens
@@ -179,7 +182,7 @@ export default Vue.extend({
 			const node = this.nodes.find(n => n.fileid === this.fileId) as Node
 			if (node && sidebarAction?.enabled?.([node], this.currentView)) {
 				logger.debug('Opening sidebar on file ' + node.path, { node })
-				sidebarAction.exec(node, this.currentView, this.currentFolder)
+				sidebarAction.exec(node, this.currentView, this.currentFolder.path)
 			}
 		}
 	},
@@ -189,7 +192,7 @@ export default Vue.extend({
 			return node.fileid
 		},
 
-		t: translate,
+		t,
 	},
 })
 </script>
@@ -306,9 +309,12 @@ export default Vue.extend({
 			}
 		}
 
-		.files-list__row{
+		.files-list__row {
 			&:hover, &:focus, &:active, &--active {
 				background-color: var(--color-background-dark);
+				> * {
+					--color-border: var(--color-border-dark);
+				}
 				// Hover state of the row should also change the favorite markers background
 				.favorite-marker-icon svg path {
 					stroke: var(--color-background-dark);
@@ -342,6 +348,15 @@ export default Vue.extend({
 				&:not(.files-list__row-icon-favorite) svg {
 					width: var(--icon-preview-size);
 					height: var(--icon-preview-size);
+				}
+
+				// Slightly increase the size of the folder icon
+				&.folder-icon {
+					margin: -3px;
+					svg {
+						width: calc(var(--icon-preview-size) + 6px);
+						height: calc(var(--icon-preview-size) + 6px);
+					}
 				}
 			}
 

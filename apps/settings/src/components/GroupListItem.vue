@@ -43,9 +43,8 @@
 				icon="icon-edit"
 				type="text"
 				:value="name"
-				@submit="renameGroup(id)">
-				{{ t('settings', 'Rename group') }}
-			</NcActionInput>
+				:label=" t('settings', 'Rename group')"
+				@submit="renameGroup(id)" />
 			<NcActionButton v-if="id !== 'admin' && id !== 'disabled' && settings.isAdmin"
 				icon="icon-delete"
 				@click="removeGroup(id)">
@@ -85,7 +84,7 @@ export default {
 		 */
 		count: {
 			type: Number,
-			required: true,
+			default: null,
 		},
 		/**
 		 * Identifier of this group

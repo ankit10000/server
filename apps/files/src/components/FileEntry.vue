@@ -25,7 +25,7 @@
 		data-cy-files-list-row
 		:data-cy-files-list-row-fileid="fileid"
 		:data-cy-files-list-row-name="source.basename"
-		class="list__row"
+		class="files-list__row"
 		@contextmenu="onRightClick">
 		<!-- Failed indicator -->
 		<span v-if="source.attributes.failed" class="files-list__row--failed" />
@@ -44,7 +44,12 @@
 		<td class="files-list__row-name" data-cy-files-list-row-name>
 			<!-- Icon or preview -->
 			<span class="files-list__row-icon" @click="execDefaultAction">
-				<FolderIcon v-if="source.type === 'folder'" />
+				<template v-if="source.type === 'folder'">
+					<FolderIcon />
+					<OverlayIcon :is="folderOverlay"
+						v-if="folderOverlay"
+						class="files-list__row-icon-overlay" />
+				</template>
 
 				<!-- Decorative image, should not be aria documented -->
 				<span v-else-if="previewUrl && !backgroundFailed"
@@ -70,7 +75,7 @@
 				class="files-list__row-rename"
 				@submit.prevent.stop="onRename">
 				<NcTextField ref="renameInput"
-					:aria-label="t('files', 'File name')"
+					:label="renameLabel"
 					:autofocus="true"
 					:minlength="1"
 					:required="true"
@@ -114,7 +119,6 @@
 				:boundaries-element="getBoundariesElement()"
 				:container="getBoundariesElement()"
 				:disabled="source._loading"
-				:force-name="true"
 				:force-menu="enabledInlineActions.length === 0 /* forceMenu only if no inline actions */"
 				:inline="enabledInlineActions.length"
 				:open.sync="openedMenu">
@@ -166,27 +170,37 @@
 </template>
 
 <script lang='ts'>
+import type { PropType } from 'vue'
+
 import { CancelablePromise } from 'cancelable-promise'
 import { debounce } from 'debounce'
 import { emit } from '@nextcloud/event-bus'
 import { extname } from 'path'
 import { generateUrl } from '@nextcloud/router'
-import { getFileActions, DefaultType, FileType, formatFileSize, Permission } from '@nextcloud/files'
+import { getFileActions, DefaultType, FileType, formatFileSize, Permission, Folder, File, Node } from '@nextcloud/files'
+import { Type as ShareType } from '@nextcloud/sharing'
 import { showError, showSuccess } from '@nextcloud/dialogs'
 import { translate } from '@nextcloud/l10n'
 import { vOnClickOutside } from '@vueuse/components'
 import axios from '@nextcloud/axios'
+import moment from '@nextcloud/moment'
+import Vue from 'vue'
+
+import AccountGroupIcon from 'vue-material-design-icons/AccountGroup.vue'
 import FileIcon from 'vue-material-design-icons/File.vue'
 import FolderIcon from 'vue-material-design-icons/Folder.vue'
-import moment from '@nextcloud/moment'
+import KeyIcon from 'vue-material-design-icons/Key.vue'
+import TagIcon from 'vue-material-design-icons/Tag.vue'
+import LinkIcon from 'vue-material-design-icons/Link.vue'
+import NetworkIcon from 'vue-material-design-icons/Network.vue'
+import AccountPlusIcon from 'vue-material-design-icons/AccountPlus.vue'
 import NcActionButton from '@nextcloud/vue/dist/Components/NcActionButton.js'
 import NcActions from '@nextcloud/vue/dist/Components/NcActions.js'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/dist/Components/NcCheckboxRadioSwitch.js'
 import NcLoadingIcon from '@nextcloud/vue/dist/Components/NcLoadingIcon.js'
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.js'
-import Vue from 'vue'
 
-import { ACTION_DETAILS } from '../actions/sidebarAction.ts'
+import { action as sidebarAction } from '../actions/sidebarAction.ts'
 import { hashCode } from '../utils/hashUtils.ts'
 import { isCachedPreview } from '../services/PreviewService.ts'
 import { useActionsMenuStore } from '../store/actionsmenu.ts'
@@ -209,16 +223,22 @@ export default Vue.extend({
 	name: 'FileEntry',
 
 	components: {
+		AccountGroupIcon,
+		AccountPlusIcon,
 		CustomElementRender,
 		CustomSvgIconRender,
 		FavoriteIcon,
 		FileIcon,
 		FolderIcon,
+		KeyIcon,
+		LinkIcon,
 		NcActionButton,
 		NcActions,
 		NcCheckboxRadioSwitch,
 		NcLoadingIcon,
 		NcTextField,
+		NetworkIcon,
+		TagIcon,
 	},
 
 	props: {
@@ -235,7 +255,7 @@ export default Vue.extend({
 			default: false,
 		},
 		source: {
-			type: Object,
+			type: [Folder, File, Node] as PropType<Node>,
 			required: true,
 		},
 		index: {
@@ -243,7 +263,7 @@ export default Vue.extend({
 			required: true,
 		},
 		nodes: {
-			type: Array,
+			type: Array as PropType<Node[]>,
 			required: true,
 		},
 		filesListWidth: {
@@ -295,7 +315,7 @@ export default Vue.extend({
 
 		currentDir() {
 			// Remove any trailing slash but leave root slash
-			return (this.$route?.query?.dir || '/').replace(/^(.+)\/$/, '$1')
+			return (this.$route?.query?.dir?.toString() || '/').replace(/^(.+)\/$/, '$1')
 		},
 		currentFileId() {
 			return this.$route.params.fileid || this.$route.query.fileid || null
@@ -351,6 +371,43 @@ export default Vue.extend({
 				return moment(this.source.mtime).format('LLL')
 			}
 			return ''
+		},
+
+		folderOverlay() {
+			if (this.source.type !== FileType.Folder) {
+				return null
+			}
+
+			// Encrypted folders
+			if (this.source?.attributes?.['is-encrypted'] === 1) {
+				return KeyIcon
+			}
+
+			// System tags
+			if (this.source?.attributes?.['is-tag']) {
+				return TagIcon
+			}
+
+			// Link and mail shared folders
+			const shareTypes = Object.values(this.source?.attributes?.['share-types'] || {}).flat() as number[]
+			if (shareTypes.some(type => type === ShareType.SHARE_TYPE_LINK || type === ShareType.SHARE_TYPE_EMAIL)) {
+				return LinkIcon
+			}
+
+			// Shared folders
+			if (shareTypes.length > 0) {
+				return AccountPlusIcon
+			}
+
+			switch (this.source?.attributes?.['mount-type']) {
+			case 'external':
+			case 'external-session':
+				return NetworkIcon
+			case 'group':
+				return AccountGroupIcon
+			}
+
+			return null
 		},
 
 		linkTo() {
@@ -479,6 +536,14 @@ export default Vue.extend({
 			return this.source.attributes.favorite === 1
 		},
 
+		renameLabel() {
+			const matchLabel: Record<FileType, string> = {
+				[FileType.File]: t('files', 'File name'),
+				[FileType.Folder]: t('files', 'Folder name'),
+			}
+			return matchLabel[this.source.type]
+		},
+
 		isRenaming() {
 			return this.renamingStore.renamingNode === this.source
 		},
@@ -513,8 +578,10 @@ export default Vue.extend({
 		 * If renaming starts, select the file name
 		 * in the input, without the extension.
 		 */
-		isRenaming() {
-			this.startRenaming()
+		isRenaming(renaming) {
+			if (renaming) {
+				this.startRenaming()
+			}
 		},
 	},
 
@@ -650,11 +717,10 @@ export default Vue.extend({
 		},
 
 		openDetailsIfAvailable(event) {
-			const detailsAction = this.enabledActions.find(action => action.id === ACTION_DETAILS)
-			if (detailsAction) {
-				event.preventDefault()
-				event.stopPropagation()
-				detailsAction.exec(this.source, this.currentView)
+			event.preventDefault()
+			event.stopPropagation()
+			if (sidebarAction?.enabled?.([this.source], this.currentView)) {
+				sidebarAction.exec(this.source, this.currentView, this.currentDir)
 			}
 		},
 
@@ -710,9 +776,10 @@ export default Vue.extend({
 		 * input validity using browser's native validation.
 		 * @param event the keyup event
 		 */
-		checkInputValidity(event: KeyboardEvent) {
-			const input = event?.target as HTMLInputElement
+		checkInputValidity(event?: KeyboardEvent) {
+			const input = event.target as HTMLInputElement
 			const newName = this.newName.trim?.() || ''
+			logger.debug('Checking input validity', { newName })
 			try {
 				this.isFileNameValid(newName)
 				input.setCustomValidity('')
@@ -745,10 +812,10 @@ export default Vue.extend({
 		},
 
 		startRenaming() {
-			this.checkInputValidity()
 			this.$nextTick(() => {
-				const extLength = (this.source.extension || '').length
-				const length = this.source.basename.length - extLength
+				// Using split to get the true string length
+				const extLength = (this.source.extension || '').split('').length
+				const length = this.source.basename.split('').length - extLength
 				const input = this.$refs.renameInput?.$refs?.inputField?.$refs?.input
 				if (!input) {
 					logger.error('Could not find the rename input')
@@ -756,6 +823,9 @@ export default Vue.extend({
 				}
 				input.setSelectionRange(0, length)
 				input.focus()
+
+				// Trigger a keyup event to update the input validity
+				input.dispatchEvent(new Event('keyup'))
 			})
 		},
 		stopRenaming() {
@@ -808,6 +878,8 @@ export default Vue.extend({
 				emit('files:node:updated', this.source)
 				emit('files:node:renamed', this.source)
 				showSuccess(this.t('files', 'Renamed "{oldName}" to "{newName}"', { oldName, newName }))
+
+				// Reset the renaming store
 				this.stopRenaming()
 				this.$nextTick(() => {
 					this.$refs.basename.focus()
@@ -822,7 +894,7 @@ export default Vue.extend({
 					showError(this.t('files', 'Could not rename "{oldName}", it does not exist any more', { oldName }))
 					return
 				} else if (error?.response?.status === 412) {
-					showError(this.t('files', 'The name "{newName}"" is already used in the folder "{dir}". Please choose a different name.', { newName, dir: this.currentDir }))
+					showError(this.t('files', 'The name "{newName}" is already used in the folder "{dir}". Please choose a different name.', { newName, dir: this.currentDir }))
 					return
 				}
 
@@ -853,10 +925,19 @@ export default Vue.extend({
 /* Hover effect on tbody lines only */
 tr {
 	&:hover,
-	&:focus,
-	&:visible {
+	&:focus {
 		background-color: var(--color-background-dark);
 	}
+}
+
+// Folder overlay
+.files-list__row-icon-overlay {
+	position: absolute;
+	max-height: 18px;
+	max-width: 18px;
+	color: var(--color-main-background);
+	// better alignment with the folder icon
+	margin-top: 2px;
 }
 
 /* Preview not loaded animation effect */
