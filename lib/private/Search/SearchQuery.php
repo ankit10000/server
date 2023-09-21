@@ -32,51 +32,39 @@ use OCP\Search\ISearchQuery;
 class SearchQuery implements ISearchQuery {
 	public const LIMIT_DEFAULT = 5;
 
-	/** @var string */
-	private $term;
-
-	/** @var int */
-	private $sortOrder;
-
-	/** @var int */
-	private $limit;
-
-	/** @var int|string|null */
-	private $cursor;
-
-	/** @var string */
-	private $route;
-
-	/** @var array */
-	private $routeParameters;
-
 	/**
-	 * @param string $term
-	 * @param int $sortOrder
-	 * @param int $limit
-	 * @param int|string|null $cursor
-	 * @param string $route
-	 * @param array $routeParameters
+	 * @param string[] $filters
+	 * @param string[] $routeParameters
 	 */
-	public function __construct(string $term,
-								int $sortOrder = ISearchQuery::SORT_DATE_DESC,
-								int $limit = self::LIMIT_DEFAULT,
-								$cursor = null,
-								string $route = '',
-								array $routeParameters = []) {
-		$this->term = $term;
-		$this->sortOrder = $sortOrder;
-		$this->limit = $limit;
-		$this->cursor = $cursor;
-		$this->route = $route;
-		$this->routeParameters = $routeParameters;
+	public function __construct(
+		private array $filters,
+		private int $sortOrder = ISearchQuery::SORT_DATE_DESC,
+		private int $limit = self::LIMIT_DEFAULT,
+		private int|string|null $cursor = null,
+		private string $route = '',
+		private	array $routeParameters = [],
+	) {
 	}
 
 	/**
 	 * @inheritDoc
 	 */
 	public function getTerm(): string {
-		return $this->term;
+		return $this->getFilter('term', '');
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function getFilter(string $name, $default = null) {
+		return array_key_exists($name, $this->filters) ? $this->filters[$name] : $default;
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function getFilters(): array {
+		return $this->filters;
 	}
 
 	/**
@@ -96,7 +84,7 @@ class SearchQuery implements ISearchQuery {
 	/**
 	 * @inheritDoc
 	 */
-	public function getCursor() {
+	public function getCursor(): int|string|null {
 		return $this->cursor;
 	}
 

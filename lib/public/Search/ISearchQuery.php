@@ -46,10 +46,31 @@ interface ISearchQuery {
 	/**
 	 * Get the user-entered search term to find matches for
 	 *
+	 * Alias for getFilter('term', '')
+	 *
 	 * @return string the search term
 	 * @since 20.0.0
+	 * @deprecated
 	 */
 	public function getTerm(): string;
+
+	/**
+	 * Get a specific user-entered filter
+	 *
+	 * @param string $name Filter name
+	 * @param mixed $default Filter default value if not exists
+	 * @return mixed Filter value or $default
+	 * @since 28.0.0
+	 */
+	public function getFilter(string $name, $default = null);
+
+	/**
+	 * Get user-entered filters
+	 *
+	 * @return mixed[] List of defined filters
+	 * @since 28.0.0
+	 */
+	public function getFilters();
 
 	/**
 	 * Get the sort order of results as defined as SORT_* constants on this interface

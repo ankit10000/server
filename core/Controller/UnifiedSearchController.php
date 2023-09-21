@@ -28,6 +28,7 @@ declare(strict_types=1);
  */
 namespace OC\Core\Controller;
 
+use DateTimeImmutable;
 use OC\Search\SearchComposer;
 use OC\Search\SearchQuery;
 use OCA\Core\ResponseDefinitions;
@@ -93,22 +94,36 @@ class UnifiedSearchController extends OCSController {
 	 * 400: Searching is not possible
 	 */
 	public function search(string $providerId,
-						   string $term = '',
 						   ?int $sortOrder = null,
 						   ?int $limit = null,
 						   $cursor = null,
 						   string $from = ''): DataResponse {
-		if (empty(trim($term))) {
+		[$route, $routeParameters] = $this->getRouteInformation($from);
+
+		$terms = [];
+		$reservedTerms = ['_route', 'providerId', 'sortOrder', 'limit', 'cursor', 'from'];
+		$knownDateTerms = ['start', 'end'];
+		foreach ($this->request->getParams() as $term => $value) {
+			$value = trim($value);
+			if ($value === '' || in_array($term, $reservedTerms, true)) {
+				continue;
+			}
+			if (in_array($term, $knownDateTerms)) {
+				$value = new DateTimeImmutable('@'.$value);
+			}
+			$terms[$term] = $value;
+		}
+
+		if (empty($terms)) {
 			return new DataResponse(null, Http::STATUS_BAD_REQUEST);
 		}
-		[$route, $routeParameters] = $this->getRouteInformation($from);
 
 		return new DataResponse(
 			$this->composer->search(
 				$this->userSession->getUser(),
 				$providerId,
 				new SearchQuery(
-					$term,
+					$terms,
 					$sortOrder ?? ISearchQuery::SORT_DATE_DESC,
 					$limit ?? SearchQuery::LIMIT_DEFAULT,
 					$cursor,
