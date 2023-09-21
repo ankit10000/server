@@ -43,9 +43,10 @@ class Version2800Date20230921144701 extends SimpleMigrationStep {
 		$statusTable = $schema->getTable('user_status');
 		if (!($statusTable->hasColumn('status_message_timestamp'))) {
 			$statusTable->addColumn('status_message_timestamp', Types::INTEGER, [
-				'notnull' => false,
+				'notnull' => true,
 				'length' => 11,
 				'unsigned' => true,
+				'default' => 0,
 			]);
 		}
 		if (!$statusTable->hasIndex('user_status_mtstmp_ix')) {

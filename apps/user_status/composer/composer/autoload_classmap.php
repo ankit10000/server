@@ -32,7 +32,6 @@ return array(
     'OCA\\UserStatus\\Migration\\Version1000Date20201111130204' => $baseDir . '/../lib/Migration/Version1000Date20201111130204.php',
     'OCA\\UserStatus\\Migration\\Version2301Date20210809144824' => $baseDir . '/../lib/Migration/Version2301Date20210809144824.php',
     'OCA\\UserStatus\\Migration\\Version2800Date20230921144701' => $baseDir . '/../lib/Migration/Version2800Date20230921144701.php',
-    'OCA\\UserStatus\\Migration\\Version2800Date20230921144702' => $baseDir . '/../lib/Migration/Version2800Date20230921144702.php',
     'OCA\\UserStatus\\ResponseDefinitions' => $baseDir . '/../lib/ResponseDefinitions.php',
     'OCA\\UserStatus\\Service\\JSDataService' => $baseDir . '/../lib/Service/JSDataService.php',
     'OCA\\UserStatus\\Service\\PredefinedStatusService' => $baseDir . '/../lib/Service/PredefinedStatusService.php',
