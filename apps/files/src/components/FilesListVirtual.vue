@@ -470,18 +470,16 @@ export default Vue.extend({
 
 		.files-list__row-mtime,
 		.files-list__row-size {
-			// Right align text
-			justify-content: flex-end;
-			width: calc(var(--row-height) * 1.5);
 			// opacity varies with the size
 			color: var(--color-main-text);
-
+		}
+		.files-list__row-size {
+			width: calc(var(--row-height) * 1.5);
+			// Right align text
+			justify-content: flex-end;
 			// Icon is before text since size is right aligned
 			.files-list__column-sort-button {
-				padding: 0 16px 0 4px !important;
-				.button-vue__wrapper {
-					flex-direction: row;
-				}
+				direction: ltr;
 			}
 		}
 
