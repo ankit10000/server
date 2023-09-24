@@ -475,12 +475,8 @@ export default Vue.extend({
 		}
 		.files-list__row-size {
 			width: calc(var(--row-height) * 1.5);
-			// Right align text
+			// Right align content/text
 			justify-content: flex-end;
-			// Icon is before text since size is right aligned
-			.files-list__column-sort-button {
-				direction: ltr;
-			}
 		}
 
 		.files-list__row-mtime {
