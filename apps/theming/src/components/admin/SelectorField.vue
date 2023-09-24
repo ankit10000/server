@@ -67,11 +67,11 @@ export default {
 			required: true,
 		},
 		value: {
-			type: Boolean,
+			type: Array,
 			required: true,
 		},
 		defaultValue: {
-			type: Boolean,
+			type: Array,
 			required: true,
 		},
 		displayName: {
@@ -102,7 +102,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import './admin/shared/field.scss';
+@use './shared/field.scss';
 
 .field {
 	&__description {

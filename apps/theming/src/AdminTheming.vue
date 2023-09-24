@@ -106,9 +106,9 @@
 				</a>
 			</div>
 		</NcSettingsSection>
-		<NcSettingsSection :title="t('theming', 'App menu settings')">
+		<NcSettingsSection :name="t('theming', 'App menu settings')">
 			<div class="admin-theming-advanced">
-				<AppsSelectorField :name="defaultAppField.name"
+				<SelectorField :name="defaultAppField.name"
 					:value="defaultAppField.value"
 					:default-value="defaultAppField.defaultValue"
 					:display-name="defaultAppField.displayName"
@@ -131,7 +131,7 @@ import { loadState } from '@nextcloud/initial-state'
 
 import NcNoteCard from '@nextcloud/vue/dist/Components/NcNoteCard.js'
 import NcSettingsSection from '@nextcloud/vue/dist/Components/NcSettingsSection.js'
-import AppsSelectorField from './components/AppsSelectorField.vue'
+import SelectorField from './components/admin/SelectorField.vue'
 import CheckboxField from './components/admin/CheckboxField.vue'
 import ColorPickerField from './components/admin/ColorPickerField.vue'
 import FileInputField from './components/admin/FileInputField.vue'
@@ -284,12 +284,12 @@ export default {
 	name: 'AdminTheming',
 
 	components: {
-		AppsSelectorField,
 		CheckboxField,
 		ColorPickerField,
 		FileInputField,
 		NcNoteCard,
 		NcSettingsSection,
+		SelectorField,
 		TextField,
 	},
 
